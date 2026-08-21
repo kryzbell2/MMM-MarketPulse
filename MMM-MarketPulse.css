@@ -1,0 +1,86 @@
+.marketpulse {
+    min-width: 250px;
+}
+
+.marketpulse-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 24px;
+    row-gap: 2px;
+}
+
+.marketpulse-item {
+    display: grid;
+    grid-template-columns: minmax(44px, 1fr) auto;
+    align-items: baseline;
+    column-gap: 10px;
+    white-space: nowrap;
+}
+
+.marketpulse-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.marketpulse-value,
+.marketpulse-list-value {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.marketpulse-item--stale .marketpulse-value,
+.marketpulse-item--stale .marketpulse-list-value {
+    opacity: 0.72;
+}
+
+.marketpulse-change {
+    grid-column: 2;
+    font-size: 70%;
+    line-height: 1;
+    text-align: right;
+}
+
+.marketpulse-change--positive {
+    color: #9bb89b;
+}
+
+.marketpulse-change--negative {
+    color: #c09a9a;
+}
+
+.marketpulse--list table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.marketpulse--list td {
+    padding: 0 0 2px 12px;
+    white-space: nowrap;
+}
+
+.marketpulse--list .marketpulse-list-label {
+    padding-left: 0;
+    padding-right: 24px;
+    text-align: left;
+}
+
+.marketpulse-list-change {
+    min-width: 42px;
+    text-align: right;
+}
+
+.marketpulse-update {
+    margin-top: 4px;
+    text-align: right;
+}
+
+@media (max-width: 420px) {
+    .marketpulse {
+        min-width: 0;
+    }
+
+    .marketpulse-grid {
+        grid-template-columns: minmax(0, 1fr);
+        column-gap: 0;
+    }
+}

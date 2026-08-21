@@ -1,0 +1,28 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "CL=F",
+          "regularMarketPrice": 86.21,
+          "chartPreviousClose": 87.25,
+          "regularMarketTime": 1787328000
+        },
+        "timestamp": [1787155200, 1787241600, 1787328000],
+        "indicators": {
+          "quote": [
+            {
+              "open": [85.9, 87.7, 87.0],
+              "high": [87.2, 88.1, 87.3],
+              "low": [85.5, 86.9, 85.8],
+              "close": [86.7, 87.25, 86.21],
+              "volume": [1000, 1200, 900]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

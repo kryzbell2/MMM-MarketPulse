@@ -1,0 +1,32 @@
+{
+  "name": "mmm-marketpulse",
+  "version": "1.0.0",
+  "description": "Compact market and energy indicators for MagicMirror²",
+  "main": "node_helper.js",
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kryzbell2/MMM-MarketPulse.git"
+  },
+  "homepage": "https://github.com/kryzbell2/MMM-MarketPulse#readme",
+  "bugs": {
+    "url": "https://github.com/kryzbell2/MMM-MarketPulse/issues"
+  },
+  "scripts": {
+    "check": "node --check MMM-MarketPulse.js && node --check node_helper.js && node --check lib/market_utils.js && node --check lib/providers.js",
+    "test": "node --test test/*.test.js",
+    "smoke": "node test/live-smoke.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "magicmirror",
+    "energy",
+    "market-data",
+    "eia",
+    "yahoo-finance"
+  ],
+  "author": "kryzbell2",
+  "license": "MIT"
+}
