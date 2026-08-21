@@ -29,7 +29,7 @@ Module.register("MMM-MarketPulse", {
     },
 
     start() {
-        this.data = null;
+        this.marketData = null;
         this.weekendTimer = null;
         this.weekendHidden = false;
         this.sendSocketNotification("MARKETPULSE_INIT", this.config);
@@ -58,7 +58,7 @@ Module.register("MMM-MarketPulse", {
             return;
         }
 
-        this.data = payload;
+        this.marketData = payload;
         this.updateDom(300);
     },
 
@@ -93,7 +93,7 @@ Module.register("MMM-MarketPulse", {
         const wrapper = document.createElement("div");
         wrapper.className = `marketpulse ${this.config.compact ? "marketpulse--compact" : "marketpulse--list"}`;
 
-        if (!this.data) {
+        if (!this.marketData) {
             wrapper.classList.add("small", "dimmed");
             wrapper.textContent = "Loading market data…";
             return wrapper;
@@ -109,10 +109,10 @@ Module.register("MMM-MarketPulse", {
             wrapper.appendChild(this.buildList(metrics));
         }
 
-        if (this.config.showLastUpdate && this.data.receivedAt) {
+        if (this.config.showLastUpdate && this.marketData.receivedAt) {
             const update = document.createElement("div");
             update.className = "marketpulse-update xsmall dimmed";
-            const date = new Date(this.data.receivedAt);
+            const date = new Date(this.marketData.receivedAt);
             update.textContent = Number.isNaN(date.getTime())
                 ? ""
                 : `Updated ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
@@ -123,8 +123,8 @@ Module.register("MMM-MarketPulse", {
     },
 
     buildMetrics() {
-        const market = this.data.market || {};
-        const calculated = this.data.calculated || {};
+        const market = this.marketData.market || {};
+        const calculated = this.marketData.calculated || {};
         const metrics = [];
 
         if (this.config.showWTI) {
@@ -139,9 +139,9 @@ Module.register("MMM-MarketPulse", {
         if (this.config.showDieselAverage) {
             metrics.push({
                 label: "Diesel",
-                value: this.formatValue(this.data.retailDiesel?.price, "currency"),
+                value: this.formatValue(this.marketData.retailDiesel?.price, "currency"),
                 change: null,
-                stale: this.data.retailDiesel?.stale === true,
+                stale: this.marketData.retailDiesel?.stale === true,
                 title: this.dieselTitle()
             });
         }
@@ -182,7 +182,7 @@ Module.register("MMM-MarketPulse", {
     },
 
     dieselTitle() {
-        const diesel = this.data.retailDiesel;
+        const diesel = this.marketData.retailDiesel;
         if (!diesel) {
             return "EIA U.S. on-highway diesel unavailable";
         }
