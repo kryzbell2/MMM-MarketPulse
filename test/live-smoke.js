@@ -1,6 +1,6 @@
 "use strict";
 
-const { fetchEiaDiesel, fetchYahooQuote } = require("../lib/providers");
+const { fetchAaaDiesel, fetchYahooQuote } = require("../lib/providers");
 
 const symbols = ["CL=F", "BZ=F", "HO=F", "RB=F", "^TNX"];
 
@@ -17,12 +17,14 @@ async function main() {
         }
     });
 
-    try {
-        const diesel = await fetchEiaDiesel();
-        console.log(`EIA diesel (${diesel.date || diesel.releaseDate || "date unavailable"}): ${diesel.price}`);
-    } catch (error) {
-        failed = true;
-        console.error(`EIA diesel: ${error.message}`);
+    for (const region of ["US", "NC"]) {
+        try {
+            const diesel = await fetchAaaDiesel({ region });
+            console.log(`AAA ${region} diesel (${diesel.date}): ${diesel.price}`);
+        } catch (error) {
+            failed = true;
+            console.error(`AAA ${region} diesel: ${error.message}`);
+        }
     }
 
     if (failed) {

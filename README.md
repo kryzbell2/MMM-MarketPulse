@@ -6,7 +6,7 @@ This release targets MagicMirror² 2.36.x and follows its CommonJS module and No
 
 ```text
 WTI       $86.21  -1.2%    Brent     $93.15  +0.4%
-ULSD       $4.37  +0.8%    Diesel     $5.45
+Diesel Fut. $4.37  +0.8%    US Diesel  $5.45
 Crack     $97.33           10Y         4.47% -0.3%
 ```
 
@@ -18,15 +18,15 @@ The compact layout uses two columns when space permits and automatically collaps
 | --- | --- | --- |
 | WTI crude | Yahoo Finance-compatible chart data, `CL=F` | $/bbl |
 | Brent crude | Yahoo Finance-compatible chart data, `BZ=F` | $/bbl |
-| ULSD / heating-oil futures | Yahoo Finance-compatible chart data, `HO=F` | $/gal |
-| U.S. retail diesel | EIA U.S. On-Highway Diesel Fuel Price, including taxes | $/gal |
+| Diesel Fut. (ULSD / heating-oil futures) | Yahoo Finance-compatible chart data, `HO=F` | $/gal |
+| U.S. or state retail diesel | AAA Fuel Prices daily average | $/gal |
 | Diesel crack | `(ULSD × 42) - WTI` | $/bbl |
 | Optional 3-2-1 crack | `((2 × RBOB × 42) + (ULSD × 42) - (3 × WTI)) / 3` | $/bbl |
 | U.S. 10-year Treasury yield | Yahoo Finance-compatible chart data, `^TNX` | % |
 
 RBOB (`RB=F`) is fetched only when `show321Crack` is enabled. The Yahoo-derived crack calculations use front-month instruments that may have different expiration months. They are indicative snapshots, **not** formally contract-matched refinery hedges.
 
-The EIA retail diesel value is weekly. MMM-MarketPulse reads the official public [Gasoline and Diesel Fuel Update](https://www.eia.gov/petroleum/gasdiesel/) and requires no API key. It caches the most recent valid observation and refreshes it every six hours by default.
+The AAA retail diesel value is updated daily. MMM-MarketPulse reads the Diesel column of the Current Avg. row on [AAA Fuel Prices](https://gasprices.aaa.com/) or the selected [state page](https://gasprices.aaa.com/?state=NC), including its publication date. It requires no API key and refreshes every four hours by default. The public HTML structure was inspected live on September 12, 2026; page changes can require parser updates.
 
 ## Installation
 
@@ -57,7 +57,8 @@ Add this block to the `modules` array in `~/MagicMirror/config/config.js`:
         showTenYearYield: true,
 
         updateInterval: 300000,
-        eiaUpdateInterval: 21600000,
+        aaaUpdateInterval: 14400000,
+        dieselRegion: "US", // use "NC" for North Carolina
 
         hideOnWeekends: true,
         showChange: true,
@@ -76,20 +77,21 @@ Restart MagicMirror after editing the configuration.
 | --- | ---: | --- |
 | `showWTI` | `true` | Show WTI crude (`CL=F`). |
 | `showBrent` | `true` | Show Brent crude (`BZ=F`). |
-| `showULSD` | `true` | Show ULSD / heating-oil futures (`HO=F`). |
-| `showDieselAverage` | `true` | Show the official weekly EIA U.S. retail diesel average. |
+| `showULSD` | `true` | Show Diesel Fut. (ULSD / heating-oil futures) (`HO=F`). |
+| `showDieselAverage` | `true` | Show the AAA daily retail diesel average. |
 | `showDieselCrack` | `true` | Show the approximate ULSD-WTI crack. |
 | `show321Crack` | `false` | Fetch RBOB and show the indicative front-month 3-2-1 crack. |
 | `showTenYearYield` | `true` | Show the U.S. 10-year Treasury yield (`^TNX`). |
 | `updateInterval` | `300000` | Yahoo refresh interval in milliseconds; values below 60 seconds are clamped. |
-| `eiaUpdateInterval` | `21600000` | EIA refresh interval in milliseconds; values below one hour are clamped. |
+| `aaaUpdateInterval` | `14400000` | AAA refresh interval in milliseconds; values below three hours are clamped. |
+| `dieselRegion` | `"US"` | National average, or a two-letter state abbreviation (including DC), e.g. `"NC"`. Metro/custom regions are not supported. |
 | `hideOnWeekends` | `true` | Hide the complete module on Saturday and Sunday in the mirror host's local timezone. |
 | `showChange` | `true` | Show Yahoo price/yield percentage change from the previous close when available. |
 | `showLastUpdate` | `false` | Show the latest module data-receipt time. |
 | `decimals` | `2` | Display precision from 0 through 4 decimal places. |
 | `compact` | `true` | Use the low-height responsive grid; `false` uses a vertical list. |
 
-The first market refresh runs immediately. Yahoo data then refreshes about every five minutes, and EIA diesel refreshes independently. Network work runs only in `node_helper.js`; rendering never makes HTTP calls.
+The first market refresh runs immediately. Yahoo data then refreshes about every five minutes, and AAA diesel refreshes independently. Network work runs only in `node_helper.js`; rendering never makes HTTP calls.
 
 ## Weekend behavior
 
@@ -97,16 +99,16 @@ With `hideOnWeekends: true`, the browser-side module checks the MagicMirror host
 
 ## Resilience and troubleshooting
 
-Each Yahoo symbol is requested independently. A failed Brent request cannot remove WTI, and a failed RBOB request produces an unavailable 3-2-1 value instead of `NaN`. The latest valid in-memory observation is preserved through temporary request failures. EIA parser or network failures never replace diesel with another source and do not affect Yahoo-derived metrics.
+Each Yahoo symbol is requested independently. A failed Brent request cannot remove WTI, and a failed RBOB request produces an unavailable 3-2-1 value instead of `NaN`. The latest valid in-memory observation is preserved through temporary request failures. The retail cache is in memory and resets when MagicMirror restarts. Failed requests retain the original fetch time; retained values are dimmed after at least 12 hours without a successful refresh. The tooltip shows AAA’s publication date. Before the first successful fetch, retail diesel displays an em dash. AAA parser or network failures never replace diesel with another source and do not affect Yahoo-derived metrics.
 
-Check the MagicMirror server log for messages beginning with `[MMM-MarketPulse]`. Typical diagnostics identify the affected Yahoo symbol or an EIA parser/network error.
+Check the MagicMirror server log for messages beginning with `[MMM-MarketPulse]`. Typical diagnostics identify the affected Yahoo symbol or an AAA parser/network error.
 
 If the module remains on “Loading market data…”:
 
-1. Confirm that the Raspberry Pi can reach `query1.finance.yahoo.com` and `www.eia.gov` over HTTPS.
+1. Confirm that the Raspberry Pi can reach `query1.finance.yahoo.com` and `gasprices.aaa.com` over HTTPS.
 2. Check that the system date, timezone, and CA certificates are correct.
 3. Run `npm test` in the module directory to verify the offline parsers and calculations.
-4. Run `npm run smoke` to make a one-time live check of all five Yahoo symbols and EIA diesel.
+4. Run `npm run smoke` to make a one-time live check of all five Yahoo symbols and AAA diesel.
 
 No API key is used or stored.
 
@@ -114,11 +116,15 @@ No API key is used or stored.
 
 ```bash
 cd ~/MagicMirror/modules/MMM-MarketPulse
-git pull
-npm install
+git pull --ff-only
+npm install --omit=dev
+npm run check
+npm test
 ```
 
-Restart MagicMirror after updating.
+Restart MagicMirror using its existing process manager. For a PM2 installation whose process is named `mm`, run `pm2 restart mm`. Run the update on each mirror.
+
+Existing configurations automatically use AAA; remove the obsolete `eiaUpdateInterval` option. Keep `showULSD` unchanged: it now controls the clearer “Diesel Fut.” label and still uses `HO=F`.
 
 ## Development
 

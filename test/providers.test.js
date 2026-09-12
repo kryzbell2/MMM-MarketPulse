@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseEiaDiesel, parseYahooChart } = require("../lib/providers");
+const { parseAaaDiesel, parseYahooChart } = require("../lib/providers");
 
 const fixture = (name) => fs.readFileSync(path.join(__dirname, "fixtures", name), "utf8");
 
@@ -39,19 +39,19 @@ test("Yahoo parser reports malformed and missing values", () => {
     assert.throws(() => parseYahooChart(payload, "CL=F"), /valid market price/);
 });
 
-test("extracts the latest U.S. diesel observation and release date from EIA HTML", () => {
-    const diesel = parseEiaDiesel(fixture("eia-diesel.html"));
-
-    assert.deepEqual(diesel, {
-        price: 5.454,
-        date: "2026-08-17",
-        releaseDate: "2026-08-18"
-    });
+test("AAA extracts national and state diesel, not headline gasoline", () => {
+    assert.deepEqual(parseAaaDiesel(fixture("aaa-us.html")), { price: 6.1602, date: "2026-09-12", region: "US", source: "AAA" });
+    assert.equal(parseAaaDiesel(fixture("aaa-nc.html"), "nc").price, 5.9819);
 });
 
-test("EIA parser fails clearly without silently inventing a diesel value", () => {
-    assert.throws(() => parseEiaDiesel("<html><body>temporarily unavailable</body></html>"), /diesel section/);
-
-    const malformed = fixture("eia-diesel.html").replace("5.454", "not available");
-    assert.throws(() => parseEiaDiesel(malformed), /missing or implausible/);
+test("AAA rejects missing, wrong-region and malformed data", () => {
+    const html = fixture("aaa-us.html");
+    for (const value of ["N/A", "$0", "$21", "$6.16bad"]) {
+        assert.throws(() => parseAaaDiesel(html.replace("$6.1602", value)), /missing or implausible/);
+    }
+    assert.throws(() => parseAaaDiesel(html, "NC"), /heading/);
+    assert.throws(() => parseAaaDiesel(html, "XX"), /Unsupported/);
+    assert.throws(() => parseAaaDiesel(""), /empty/);
+    assert.throws(() => parseAaaDiesel(html.replace("Diesel</th>", "Other</th>")), /missing or implausible/);
+    assert.throws(() => parseAaaDiesel(html.replace("9/12/26", "2/30/26")), /date/);
 });

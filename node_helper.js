@@ -1,7 +1,7 @@
 "use strict";
 
 const NodeHelper = require("node_helper");
-const { fetchEiaDiesel, fetchYahooQuote } = require("./lib/providers");
+const { fetchAaaDiesel, fetchYahooQuote } = require("./lib/providers");
 const {
     calculate321Crack,
     calculateDieselCrack,
@@ -9,9 +9,9 @@ const {
 } = require("./lib/market_utils");
 
 const DEFAULT_MARKET_INTERVAL = 300000;
-const DEFAULT_EIA_INTERVAL = 21600000;
+const DEFAULT_AAA_INTERVAL = 14400000;
 const MIN_MARKET_INTERVAL = 60000;
-const MIN_EIA_INTERVAL = 3600000;
+const MIN_AAA_INTERVAL = 10800000;
 const REQUEST_TIMEOUT = 12000;
 
 const MARKET_DEFINITIONS = {
@@ -30,11 +30,11 @@ module.exports = NodeHelper.create({
     start() {
         this.config = null;
         this.marketCache = {};
-        this.eiaCache = null;
+        this.aaaCache = null;
         this.marketTimer = null;
-        this.eiaTimer = null;
+        this.aaaTimer = null;
         this.marketRequest = null;
-        this.eiaRequest = null;
+        this.aaaRequest = null;
     },
 
     stop() {
@@ -55,18 +55,20 @@ module.exports = NodeHelper.create({
             show321Crack: payload?.show321Crack === true,
             showTenYearYield: payload?.showTenYearYield !== false,
             updateInterval: safeInterval(payload?.updateInterval, DEFAULT_MARKET_INTERVAL, MIN_MARKET_INTERVAL),
-            eiaUpdateInterval: safeInterval(payload?.eiaUpdateInterval, DEFAULT_EIA_INTERVAL, MIN_EIA_INTERVAL)
+            dieselRegion: payload?.dieselRegion || "US",
+            aaaUpdateInterval: safeInterval(payload?.aaaUpdateInterval, DEFAULT_AAA_INTERVAL, MIN_AAA_INTERVAL)
         };
 
+        if (this.aaaCache?.region !== String(this.config.dieselRegion).trim().toUpperCase()) this.aaaCache = null;
         this.clearTimers();
         this.refreshMarket();
         if (this.config.showDieselAverage) {
-            this.refreshEia();
+            this.refreshAaa();
         }
 
         this.marketTimer = setInterval(() => this.refreshMarket(), this.config.updateInterval);
         if (this.config.showDieselAverage) {
-            this.eiaTimer = setInterval(() => this.refreshEia(), this.config.eiaUpdateInterval);
+            this.aaaTimer = setInterval(() => this.refreshAaa(), this.config.aaaUpdateInterval);
         }
     },
 
@@ -75,9 +77,9 @@ module.exports = NodeHelper.create({
             clearInterval(this.marketTimer);
             this.marketTimer = null;
         }
-        if (this.eiaTimer) {
-            clearInterval(this.eiaTimer);
-            this.eiaTimer = null;
+        if (this.aaaTimer) {
+            clearInterval(this.aaaTimer);
+            this.aaaTimer = null;
         }
     },
 
@@ -111,28 +113,30 @@ module.exports = NodeHelper.create({
         return null;
     },
 
-    async refreshEia() {
-        if (!this.config || this.eiaRequest) {
-            return this.eiaRequest;
+    async refreshAaa() {
+        if (!this.config || this.aaaRequest) {
+            return this.aaaRequest;
         }
 
-        this.eiaRequest = (async () => {
+        this.aaaRequest = (async () => {
             try {
-                const diesel = await fetchEiaDiesel({ timeout: REQUEST_TIMEOUT });
-                this.eiaCache = {
+                const region = this.config.dieselRegion;
+                const diesel = await fetchAaaDiesel({ timeout: REQUEST_TIMEOUT, region });
+                if (region !== this.config.dieselRegion) return;
+                this.aaaCache = {
                     ...diesel,
                     fetchedAt: new Date().toISOString()
                 };
             } catch (error) {
-                console.error(`[MMM-MarketPulse] EIA diesel fetch/parser failed: ${error.message}`);
+                console.error(`[MMM-MarketPulse] AAA diesel fetch/parser failed: ${error.message}`);
             }
             this.sendCurrentData();
         })();
 
         try {
-            await this.eiaRequest;
+            await this.aaaRequest;
         } finally {
-            this.eiaRequest = null;
+            this.aaaRequest = null;
         }
 
         return null;
@@ -141,14 +145,14 @@ module.exports = NodeHelper.create({
     sendCurrentData() {
         const now = Date.now();
         const marketStaleAfter = Math.max(this.config.updateInterval * 3, 900000);
-        const eiaStaleAfter = Math.max(this.config.eiaUpdateInterval * 2, 43200000);
+        const aaaStaleAfter = Math.max(this.config.aaaUpdateInterval * 2, 43200000);
         const market = Object.fromEntries(Object.entries(this.marketCache).map(([key, quote]) => [key, {
             ...quote,
             stale: !Date.parse(quote.fetchedAt) || now - Date.parse(quote.fetchedAt) > marketStaleAfter
         }]));
-        const retailDiesel = this.eiaCache ? {
-            ...this.eiaCache,
-            stale: !Date.parse(this.eiaCache.fetchedAt) || now - Date.parse(this.eiaCache.fetchedAt) > eiaStaleAfter
+        const retailDiesel = this.aaaCache ? {
+            ...this.aaaCache,
+            stale: !Date.parse(this.aaaCache.fetchedAt) || now - Date.parse(this.aaaCache.fetchedAt) > aaaStaleAfter
         } : null;
         const wti = market.wti?.price;
         const ulsd = market.ulsd?.price;

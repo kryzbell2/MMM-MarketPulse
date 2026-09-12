@@ -12,7 +12,8 @@ Module.register("MMM-MarketPulse", {
         show321Crack: false,
         showTenYearYield: true,
         updateInterval: 300000,
-        eiaUpdateInterval: 21600000,
+        aaaUpdateInterval: 14400000,
+        dieselRegion: "US",
         hideOnWeekends: true,
         showChange: true,
         showLastUpdate: false,
@@ -134,11 +135,11 @@ Module.register("MMM-MarketPulse", {
             metrics.push(this.quoteMetric("Brent", market.brent, "currency"));
         }
         if (this.config.showULSD) {
-            metrics.push(this.quoteMetric("ULSD", market.ulsd, "currency"));
+            metrics.push(this.quoteMetric("Diesel Fut.", market.ulsd, "currency"));
         }
         if (this.config.showDieselAverage) {
             metrics.push({
-                label: "Diesel",
+                label: `${this.marketData.retailDiesel?.region || this.config.dieselRegion || "US"} Diesel`,
                 value: this.formatValue(this.marketData.retailDiesel?.price, "currency"),
                 change: null,
                 stale: this.marketData.retailDiesel?.stale === true,
@@ -184,11 +185,11 @@ Module.register("MMM-MarketPulse", {
     dieselTitle() {
         const diesel = this.marketData.retailDiesel;
         if (!diesel) {
-            return "EIA U.S. on-highway diesel unavailable";
+            return "AAA retail diesel unavailable";
         }
 
-        const date = diesel.date || diesel.releaseDate;
-        return date ? `EIA U.S. average, week of ${date}` : "EIA U.S. on-highway diesel average";
+        const date = diesel.date;
+        return `AAA ${diesel.region} retail diesel ($/gal)${date ? `, as of ${date}` : ""}`;
     },
 
     normalizedDecimals() {
