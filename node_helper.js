@@ -1,7 +1,7 @@
 "use strict";
 
 const NodeHelper = require("node_helper");
-const { fetchAaaDiesel, fetchYahooQuote } = require("./lib/providers");
+const { fetchAaaDiesel, fetchAaaGas, fetchYahooQuote } = require("./lib/providers");
 const {
     calculate321Crack,
     calculateDieselCrack,
@@ -17,7 +17,7 @@ const REQUEST_TIMEOUT = 12000;
 const MARKET_DEFINITIONS = {
     wti: { symbol: "CL=F", enabled: (config) => config.showWTI || config.showDieselCrack || config.show321Crack },
     brent: { symbol: "BZ=F", enabled: (config) => config.showBrent },
-    ulsd: { symbol: "HO=F", enabled: (config) => config.showULSD || config.showDieselCrack || config.show321Crack },
+    ulsd: { symbol: "HO=F", enabled: (config) => config.showDieselCrack || config.show321Crack },
     rbob: { symbol: "RB=F", enabled: (config) => config.show321Crack },
     tenYear: { symbol: "^TNX", enabled: (config) => config.showTenYearYield }
 };
@@ -31,6 +31,7 @@ module.exports = NodeHelper.create({
         this.config = null;
         this.marketCache = {};
         this.aaaCache = null;
+        this.gasCache = null;
         this.marketTimer = null;
         this.aaaTimer = null;
         this.marketRequest = null;
@@ -49,7 +50,7 @@ module.exports = NodeHelper.create({
         this.config = {
             showWTI: payload?.showWTI !== false,
             showBrent: payload?.showBrent !== false,
-            showULSD: payload?.showULSD !== false,
+            showGasAverage: payload?.showGasAverage !== false,
             showDieselAverage: payload?.showDieselAverage !== false,
             showDieselCrack: payload?.showDieselCrack !== false,
             show321Crack: payload?.show321Crack === true,
@@ -62,12 +63,12 @@ module.exports = NodeHelper.create({
         if (this.aaaCache?.region !== String(this.config.dieselRegion).trim().toUpperCase()) this.aaaCache = null;
         this.clearTimers();
         this.refreshMarket();
-        if (this.config.showDieselAverage) {
+        if (this.config.showDieselAverage || this.config.showGasAverage) {
             this.refreshAaa();
         }
 
         this.marketTimer = setInterval(() => this.refreshMarket(), this.config.updateInterval);
-        if (this.config.showDieselAverage) {
+        if (this.config.showDieselAverage || this.config.showGasAverage) {
             this.aaaTimer = setInterval(() => this.refreshAaa(), this.config.aaaUpdateInterval);
         }
     },
@@ -118,20 +119,19 @@ module.exports = NodeHelper.create({
             return this.aaaRequest;
         }
 
-        this.aaaRequest = (async () => {
+        const region = this.config.dieselRegion;
+        const jobs = [];
+        if (this.config.showDieselAverage) jobs.push({ key: "aaaCache", name: "diesel", fetch: () => fetchAaaDiesel({ timeout: REQUEST_TIMEOUT, region }) });
+        if (this.config.showGasAverage) jobs.push({ key: "gasCache", name: "regular gasoline", fetch: () => fetchAaaGas({ timeout: REQUEST_TIMEOUT }) });
+        this.aaaRequest = Promise.allSettled(jobs.map(async (job) => {
             try {
-                const region = this.config.dieselRegion;
-                const diesel = await fetchAaaDiesel({ timeout: REQUEST_TIMEOUT, region });
-                if (region !== this.config.dieselRegion) return;
-                this.aaaCache = {
-                    ...diesel,
-                    fetchedAt: new Date().toISOString()
-                };
+                const fuel = await job.fetch();
+                if (job.key === "aaaCache" && region !== this.config.dieselRegion) return;
+                this[job.key] = { ...fuel, fetchedAt: new Date().toISOString() };
             } catch (error) {
-                console.error(`[MMM-MarketPulse] AAA diesel fetch/parser failed: ${error.message}`);
+                console.error(`[MMM-MarketPulse] AAA ${job.name} fetch/parser failed: ${error.message}`);
             }
-            this.sendCurrentData();
-        })();
+        })).then(() => this.sendCurrentData());
 
         try {
             await this.aaaRequest;
@@ -154,6 +154,10 @@ module.exports = NodeHelper.create({
             ...this.aaaCache,
             stale: !Date.parse(this.aaaCache.fetchedAt) || now - Date.parse(this.aaaCache.fetchedAt) > aaaStaleAfter
         } : null;
+        const retailGas = this.gasCache ? {
+            ...this.gasCache,
+            stale: !Date.parse(this.gasCache.fetchedAt) || now - Date.parse(this.gasCache.fetchedAt) > aaaStaleAfter
+        } : null;
         const wti = market.wti?.price;
         const ulsd = market.ulsd?.price;
         const rbob = market.rbob?.price;
@@ -162,6 +166,7 @@ module.exports = NodeHelper.create({
             receivedAt: new Date().toISOString(),
             market,
             retailDiesel,
+            retailGas,
             calculated: {
                 dieselCrack: calculateDieselCrack(ulsd, wti),
                 crack321: calculate321Crack(rbob, ulsd, wti)

@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseAaaDiesel, parseYahooChart } = require("../lib/providers");
+const { parseAaaGas, parseAaaDiesel, parseYahooChart } = require("../lib/providers");
 
 const fixture = (name) => fs.readFileSync(path.join(__dirname, "fixtures", name), "utf8");
 
@@ -54,4 +54,14 @@ test("AAA rejects missing, wrong-region and malformed data", () => {
     assert.throws(() => parseAaaDiesel(""), /empty/);
     assert.throws(() => parseAaaDiesel(html.replace("Diesel</th>", "Other</th>")), /missing or implausible/);
     assert.throws(() => parseAaaDiesel(html.replace("9/12/26", "2/30/26")), /date/);
+});
+
+test("AAA gas selects current national Regular column and validates it independently", () => {
+    const html = fixture("aaa-us.html");
+    assert.deepEqual(parseAaaGas(html), { price: 4.3104, date: "2026-09-12", region: "US", source: "AAA" });
+    assert.equal(parseAaaGas(html.replace("$6.1602", "N/A")).price, 4.3104);
+    for (const value of ["N/A", "$0", "$21", "$4bad"]) {
+        assert.throws(() => parseAaaGas(html.replace("$4.3104", value)), /missing or implausible/);
+    }
+    assert.throws(() => parseAaaGas(fixture("aaa-nc.html")), /heading/);
 });

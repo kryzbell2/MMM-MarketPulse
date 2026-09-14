@@ -40,11 +40,16 @@ test("preserves MagicMirror's module placement metadata", () => {
     assert.equal(instance.marketData, payload);
 });
 
-test("uses clear futures and regional retail labels with dated AAA tooltip", () => {
+test("uses national gas and regional diesel labels with dated AAA tooltip", () => {
     const instance = Object.create(loadDefinition());
     instance.config = { ...instance.defaults, dieselRegion: "NC" };
-    instance.marketData = { market: { ulsd: { price: 3 } }, retailDiesel: { region: "NC", price: 4, date: "2026-09-12" } };
+    instance.marketData = { market: { ulsd: { price: 3 } }, retailGas: { price: 4.31, date: "2026-09-14", stale: true }, retailDiesel: { region: "NC", price: 4, date: "2026-09-12" } };
     const metrics = instance.buildMetrics();
-    assert.ok(metrics.some((metric) => metric.label === "Diesel Fut."));
+    const gas = metrics.find((metric) => metric.label === "US Gas");
+    assert.equal(gas.value, "$4.31");
+    assert.equal(gas.stale, true);
+    assert.equal(gas.change, null);
+    assert.match(gas.title, /regular gasoline.*2026-09-14/);
+    assert.ok(!metrics.some((metric) => metric.label === "Diesel Fut."));
     assert.match(metrics.find((metric) => metric.label === "NC Diesel").title, /AAA NC.*2026-09-12/);
 });

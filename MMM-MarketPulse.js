@@ -6,7 +6,7 @@ Module.register("MMM-MarketPulse", {
     defaults: {
         showWTI: true,
         showBrent: true,
-        showULSD: true,
+        showGasAverage: true,
         showDieselAverage: true,
         showDieselCrack: true,
         show321Crack: false,
@@ -134,8 +134,15 @@ Module.register("MMM-MarketPulse", {
         if (this.config.showBrent) {
             metrics.push(this.quoteMetric("Brent", market.brent, "currency"));
         }
-        if (this.config.showULSD) {
-            metrics.push(this.quoteMetric("Diesel Fut.", market.ulsd, "currency"));
+        if (this.config.showGasAverage) {
+            const gas = this.marketData.retailGas;
+            metrics.push({
+                label: "US Gas",
+                value: this.formatValue(gas?.price, "currency"),
+                change: null,
+                stale: gas?.stale === true,
+                title: gas ? `AAA U.S. regular gasoline ($/gal), as of ${gas.date}` : "AAA U.S. regular gasoline unavailable"
+            });
         }
         if (this.config.showDieselAverage) {
             metrics.push({

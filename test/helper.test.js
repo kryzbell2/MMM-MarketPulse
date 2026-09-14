@@ -4,20 +4,20 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const path = require("node:path");
-function helper(fetchAaaDiesel) {
+function helper(fetchAaaDiesel, fetchAaaGas = async () => ({ price: 4, date: "2026-09-14", region: "US" })) {
     const timers = [];
     const module = { exports: {} };
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../node_helper.js"), "utf8"), {
         module, require(name) {
             if (name === "node_helper") return { create: (value) => value };
-            if (name === "./lib/providers") return { fetchAaaDiesel, fetchYahooQuote: async () => ({ price: 80 }) };
+            if (name === "./lib/providers") return { fetchAaaDiesel, fetchAaaGas, fetchYahooQuote: async () => ({ price: 80 }) };
             return require(path.join(__dirname, "..", name));
         }, console: { error() {} }, Date, setInterval(fn, ms) { timers.push(ms); return timers.length; }, clearInterval() {}
     });
     const instance = module.exports;
     instance.start();
     instance.sendSocketNotification = (_, data) => { instance.sent = data; };
-    instance.config = { updateInterval: 300000, aaaUpdateInterval: 14400000, dieselRegion: "US" };
+    instance.config = { updateInterval: 300000, aaaUpdateInterval: 14400000, dieselRegion: "US", showDieselAverage: true, showGasAverage: true };
     return { instance, timers };
 }
 test("AAA failure retains last valid value and timestamp; market calculations survive", async () => {
@@ -50,4 +50,30 @@ test("AAA cadence defaults to four hours and clamps to three hours", () => {
     instance.socketNotificationReceived("MARKETPULSE_INIT", { aaaUpdateInterval: 1, dieselRegion: "NC" });
     assert.equal(timers.at(-1), 10800000);
     assert.equal(instance.config.dieselRegion, "NC");
+});
+
+test("gas failure preserves its cache while NC diesel updates independently", async () => {
+    let fail = false;
+    const { instance } = helper(async () => ({ price: 5, region: "NC" }), async () => {
+        if (fail) throw new Error("unavailable");
+        return { price: 4, region: "US", date: "2026-09-14" };
+    });
+    instance.config.dieselRegion = "NC";
+    await instance.refreshAaa();
+    const cached = instance.gasCache;
+    cached.fetchedAt = new Date(Date.now() - 13 * 3600000).toISOString();
+    fail = true;
+    await instance.refreshAaa();
+    assert.equal(instance.gasCache, cached);
+    assert.equal(instance.sent.retailGas.stale, true);
+    assert.equal(instance.sent.retailGas.region, "US");
+    assert.equal(instance.sent.retailDiesel.region, "NC");
+});
+
+test("gas refresh runs when diesel is hidden", async () => {
+    const { instance } = helper(async () => { throw new Error("should not run"); });
+    instance.config.showDieselAverage = false;
+    await instance.refreshAaa();
+    assert.equal(instance.sent.retailGas.price, 4);
+    assert.equal(instance.sent.retailDiesel, null);
 });

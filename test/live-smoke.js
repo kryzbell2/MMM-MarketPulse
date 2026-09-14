@@ -1,6 +1,6 @@
 "use strict";
 
-const { fetchAaaDiesel, fetchYahooQuote } = require("../lib/providers");
+const { fetchAaaGas, fetchAaaDiesel, fetchYahooQuote } = require("../lib/providers");
 
 const symbols = ["CL=F", "BZ=F", "HO=F", "RB=F", "^TNX"];
 
@@ -25,6 +25,14 @@ async function main() {
             failed = true;
             console.error(`AAA ${region} diesel: ${error.message}`);
         }
+    }
+
+    try {
+        const gas = await fetchAaaGas();
+        console.log(`AAA US regular gasoline (${gas.date}): ${gas.price}`);
+    } catch (error) {
+        failed = true;
+        console.error(`AAA US regular gasoline: ${error.message}`);
     }
 
     if (failed) {
